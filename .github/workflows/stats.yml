@@ -1,54 +1,36 @@
 name: Generate stats card
 
 on:
-  schedule:
-    - cron: "0 */12 * * *"
+  schedule: # execute every 12 hours
+    - cron: "* */12 * * *"
+
   workflow_dispatch:
+
   push:
     branches:
-      - main
+    - main
 
 jobs:
   generate:
-    runs-on: ubuntu-latest
     permissions:
       contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: generate stats.svg
+        uses: readme-tools/github-readme-stats-action@v1
         with:
-          python-version: '3.10'
+          card: stats
+          options: username=${{ github.repository_owner }}&hide_title=false&hide_rank=false&show_icons=true&include_all_commits=true&count_private=true&disable_animations=false&theme=codeSTACKr&locale=pt-br&hide_border=false
+          path: dist/stats.svg
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate and commit stats
+
+      - name: push stats.svg to the output branch
+        uses: crazy-max/ghaction-github-pages@v3.1.0
+        with:
+          target_branch: stats-output
+          build_dir: dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Cria a pasta dist se não existir
-          mkdir -p dist
-          
-          # Baixa o SVG gerado pelo github-readme-stats usando a URL oficial
-          # Substitua 'seu-usuario' pelo seu nome de usuário do GitHub reais se necessário, 
-          # ou deixe ${GITHUB_REPOSITORY%%/*} que pega o dono automaticamente.
-          OWNER="${{ github.repository_owner }}"
-          URL="https://github-readme-stats.vercel.app/api?username=${OWNER}&hide_title=false&hide_rank=false&show_icons=true&include_all_commits=true&count_private=true&disable_animations=false&theme=codeSTACKr&locale=pt-br&hide_border=false"
-          
-          echo "Baixando stats de: $URL"
-          curl -s "$URL" -o dist/stats.svg
-          
-          # Configura o git do bot
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          
-          # Faz o push para a branch stats-output (criando-a se não existir)
-          git checkout --orphan stats-output || git checkout stats-output
-          git rm -rf . || true
-          mv dist/stats.svg stats.svg
-          rm -rf dist
-          
-          git add stats.svg
-          git commit -m "chore: update stats card [skip ci]" || echo "Nenhuma mudança para commitar"
-          git push origin stats-output --force
